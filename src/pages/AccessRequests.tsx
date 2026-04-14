@@ -760,7 +760,7 @@ const RequestForm: React.FC<RequestFormProps> = ({ onClose }) => {
         </label>
         <textarea
           value={form.reason}
-          onChange={(e) => setErrors((err) => ({ ...err, reason: '' })) || setForm((f) => ({ ...f, reason: e.target.value }))}
+          onChange={(e) => { setErrors((err) => ({ ...err, reason: '' })); setForm((f) => ({ ...f, reason: e.target.value })); }}
           rows={3}
           placeholder="Describe why this access is needed..."
           className={`w-full px-3 py-2 text-sm border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 ${

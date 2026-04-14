@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import {
   ChevronRight, ChevronDown, Database, Table2, Layers,
-  CheckCircle2, AlertCircle, RefreshCw, Plus, Server, Wifi,
-  LayoutGrid, List,
+  CheckCircle2, RefreshCw, Plus, Server, Wifi,
+  LayoutGrid,
 } from 'lucide-react';
-import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { SystemBadge } from '../components/ui/Badge';
