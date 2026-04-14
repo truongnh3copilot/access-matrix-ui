@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { StatusBadge, SystemBadge, AccessBadge } from '../components/ui/Badge';
+import { SystemBadge, AccessBadge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { Avatar } from '../components/ui/Avatar';
 import { AccessRequest, AccessLevel, RequestStatus, SystemType } from '../types';
@@ -400,13 +400,7 @@ const RequestRow: React.FC<RequestRowProps> = ({ request, isAdmin, onApprove, on
           </p>
         </div>
 
-        <div className="hidden md:flex items-center gap-2 flex-shrink-0">
-          <SystemBadge type={request.systemType} />
-          <AccessBadge level={request.accessLevel} />
-        </div>
-
         <div className="flex items-center gap-2 flex-shrink-0">
-          <StatusBadge status={request.status} />
           {isAdmin && request.status === 'pending' && (
             <>
               <Button

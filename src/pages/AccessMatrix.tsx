@@ -1,12 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import {
-  Search, Plus, Trash2, Users, ShieldCheck,
-  Database, ChevronRight,
+  Search, Trash2, Users, ShieldCheck,
+  Database,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
 import { SystemBadge, UserStatusBadge } from '../components/ui/Badge';
-import { Modal } from '../components/ui/Modal';
 import { Avatar } from '../components/ui/Avatar';
 import { Permission, SystemType, User } from '../types';
 import { MOCK_USERS } from '../data/users';
@@ -62,163 +60,6 @@ const PERM_STYLE: Record<Permission, { active: string; hover: string; label: str
   admin: { active: 'bg-red-500    text-white', hover: 'hover:bg-red-50    hover:text-red-600    hover:border-red-300',    label: 'Admin' },
 };
 
-// ─── Grant Access Modal ───────────────────────────────────────────────────────
-
-interface GrantModalProps {
-  user: User;
-  existingIds: Set<string>;
-  onClose: () => void;
-  onGrant: (resourceId: string, resourceType: 'table' | 'report', permissions: Permission[]) => void;
-}
-
-const GrantModal: React.FC<GrantModalProps> = ({ user, existingIds, onClose, onGrant }) => {
-  const [search, setSearch]         = useState('');
-  const [systemFilter, setSystemFilter] = useState<SystemType | 'all'>('all');
-  const [selected, setSelected]     = useState<ResourceMeta | null>(null);
-  const [perms, setPerms]           = useState<Set<Permission>>(new Set(['read']));
-
-  const filtered = CATALOG.filter((r) => {
-    if (existingIds.has(r.id)) return false;
-    if (systemFilter !== 'all' && r.systemType !== systemFilter) return false;
-    if (search && !r.name.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
-
-  function togglePerm(p: Permission) {
-    setPerms((prev) => {
-      const next = new Set(prev);
-      next.has(p) ? next.delete(p) : next.add(p);
-      return next;
-    });
-  }
-
-  function handleGrant() {
-    if (!selected || perms.size === 0) return;
-    onGrant(selected.id, selected.resourceType, Array.from(perms));
-    onClose();
-  }
-
-  const SYSTEM_FILTERS: { value: SystemType | 'all'; label: string }[] = [
-    { value: 'all',        label: 'All'        },
-    { value: 'redshift',   label: 'Redshift'   },
-    { value: 'postgresql', label: 'PostgreSQL' },
-    { value: 'sqlserver',  label: 'SQL Server' },
-    { value: 'powerbi',    label: 'Power BI'   },
-  ];
-
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title={`Grant Access — ${user.name}`}
-      size="lg"
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button
-            variant="primary"
-            disabled={!selected || perms.size === 0}
-            onClick={handleGrant}
-          >
-            Grant Access
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        {/* System filter + search */}
-        <div className="flex flex-wrap gap-2">
-          {SYSTEM_FILTERS.map(({ value, label }) => (
-            <button
-              key={value}
-              onClick={() => { setSystemFilter(value); setSelected(null); }}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                systemFilter === value
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search resources..."
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        {/* Resource list */}
-        <div className="border border-gray-200 rounded-xl overflow-hidden max-h-52 overflow-y-auto scrollbar-thin">
-          {filtered.length === 0 ? (
-            <div className="py-8 text-center text-sm text-gray-400">No available resources.</div>
-          ) : (
-            filtered.map((r) => (
-              <button
-                key={r.id}
-                onClick={() => setSelected(r)}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors border-b border-gray-50 last:border-0 ${
-                  selected?.id === r.id
-                    ? 'bg-blue-50 border-blue-100'
-                    : 'hover:bg-gray-50'
-                }`}
-              >
-                <ChevronRight className={`w-4 h-4 flex-shrink-0 ${selected?.id === r.id ? 'text-blue-500' : 'text-gray-300'}`} />
-                <div className="flex-1 min-w-0">
-                  <span className="font-medium text-sm text-gray-800">{r.name}</span>
-                  <span className="text-xs text-gray-400 ml-2">{r.path}</span>
-                </div>
-                <SystemBadge type={r.systemType} />
-              </button>
-            ))
-          )}
-        </div>
-
-        {/* Permission checkboxes */}
-        {selected && (
-          <div className="border border-blue-100 bg-blue-50/40 rounded-xl p-4">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-              Permissions for <strong className="text-gray-700">{selected.name}</strong>
-            </p>
-            <div className="flex gap-3">
-              {PERMISSIONS.map((p) => {
-                const on = perms.has(p);
-                const s  = PERM_STYLE[p];
-                return (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => togglePerm(p)}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
-                      on
-                        ? `${s.active} border-transparent shadow-sm`
-                        : `bg-white text-gray-500 border-gray-200 ${s.hover}`
-                    }`}
-                  >
-                    <span className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                      on ? 'bg-white/30 border-white' : 'border-gray-300'
-                    }`}>
-                      {on && <span className="w-2 h-2 bg-white rounded-sm block" />}
-                    </span>
-                    {s.label}
-                  </button>
-                );
-              })}
-            </div>
-            {perms.size === 0 && (
-              <p className="text-xs text-red-500 mt-2">Select at least one permission.</p>
-            )}
-          </div>
-        )}
-      </div>
-    </Modal>
-  );
-};
-
 // ─── Permission Toggle Chip ───────────────────────────────────────────────────
 
 interface PermChipProps {
@@ -254,12 +95,10 @@ interface UserDetailPanelProps {
 }
 
 const UserDetailPanel: React.FC<UserDetailPanelProps> = ({ user, isAdmin }) => {
-  const { accessEntries, togglePermission, grantAccess, revokeResource } = useStore();
+  const { accessEntries, togglePermission, revokeResource } = useStore();
   const [systemFilter, setSystemFilter] = useState<SystemType | 'all'>('all');
-  const [showGrant, setShowGrant]       = useState(false);
 
   const entries = accessEntries.filter((e) => e.userId === user.id);
-  const existingIds = new Set(entries.map((e) => e.resourceId));
 
   const rows = useMemo(() => {
     return entries
@@ -291,20 +130,8 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({ user, isAdmin }) => {
           </div>
           <UserStatusBadge status={user.status} />
         </div>
-        <div className="flex items-center gap-2">
-          <div className="text-xs text-gray-400 bg-white border border-gray-200 px-2 py-1 rounded-lg">
-            {entries.length} resource{entries.length !== 1 ? 's' : ''}
-          </div>
-          {isAdmin && (
-            <Button
-              variant="primary"
-              size="sm"
-              icon={<Plus className="w-4 h-4" />}
-              onClick={() => setShowGrant(true)}
-            >
-              Grant Access
-            </Button>
-          )}
+        <div className="text-xs text-gray-400 bg-white border border-gray-200 px-2 py-1 rounded-lg">
+          {entries.length} resource{entries.length !== 1 ? 's' : ''}
         </div>
       </div>
 
@@ -334,7 +161,7 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({ user, isAdmin }) => {
             </div>
             <p className="text-sm font-medium text-gray-500">No access granted</p>
             <p className="text-xs text-gray-400 mt-1">
-              {isAdmin ? 'Click "Grant Access" to add permissions.' : 'This user has no access for the selected filter.'}
+              This user has no access for the selected filter.
             </p>
           </div>
         ) : (
@@ -402,17 +229,6 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({ user, isAdmin }) => {
         )}
       </div>
 
-      {/* Grant modal */}
-      {showGrant && (
-        <GrantModal
-          user={user}
-          existingIds={existingIds}
-          onClose={() => setShowGrant(false)}
-          onGrant={(resourceId, resourceType, permissions) =>
-            grantAccess(user.id, resourceId, resourceType, permissions)
-          }
-        />
-      )}
     </div>
   );
 };
