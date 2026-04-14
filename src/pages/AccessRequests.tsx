@@ -394,6 +394,15 @@ const RequestRow: React.FC<RequestRowProps> = ({ request, isAdmin, onApprove, on
                 on behalf of <strong>{target?.name}</strong>
               </span>
             )}
+            {request.requestType === 'revoke' ? (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 border border-red-200">
+                Remove Access
+              </span>
+            ) : (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 border border-blue-200">
+                Grant Access
+              </span>
+            )}
           </div>
           <p className="text-xs text-gray-500 mt-0.5 truncate">
             {request.resourcePath} › {request.resourceName}

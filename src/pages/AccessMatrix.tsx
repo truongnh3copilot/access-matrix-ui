@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import {
   Search, Trash2, Users, ShieldCheck,
-  Database,
+  Database, AlertTriangle,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Modal } from '../components/ui/Modal';
 import { SystemBadge, UserStatusBadge } from '../components/ui/Badge';
 import { Avatar } from '../components/ui/Avatar';
 import { Permission, SystemType, User } from '../types';
@@ -60,6 +62,123 @@ const PERM_STYLE: Record<Permission, { active: string; hover: string; label: str
   admin: { active: 'bg-red-500    text-white', hover: 'hover:bg-red-50    hover:text-red-600    hover:border-red-300',    label: 'Admin' },
 };
 
+// ─── Revoke Confirm Modal ─────────────────────────────────────────────────────
+
+interface RevokeTarget {
+  resourceId:   string;
+  resourceName: string;
+  resourcePath: string;
+  systemType:   SystemType;
+  resourceType: 'table' | 'report';
+  permissions:  Permission[];
+}
+
+interface RevokeConfirmModalProps {
+  target:    RevokeTarget;
+  user:      User;
+  onClose:   () => void;
+  onConfirm: (comment: string) => void;
+  loading:   boolean;
+}
+
+const RevokeConfirmModal: React.FC<RevokeConfirmModalProps> = ({
+  target, user, onClose, onConfirm, loading,
+}) => {
+  const [comment, setComment] = useState('');
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Request Access Removal"
+      size="md"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button
+            variant="danger"
+            loading={loading}
+            disabled={!comment.trim()}
+            onClick={() => onConfirm(comment)}
+          >
+            Submit Removal Request
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        {/* Warning banner */}
+        <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl p-4">
+          <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-red-700">Remove Access Request</p>
+            <p className="text-xs text-red-600 mt-0.5">
+              This will submit a removal request. Access will only be revoked after approval.
+            </p>
+          </div>
+        </div>
+
+        {/* Detail summary */}
+        <div className="bg-gray-50 rounded-xl p-4 space-y-2.5 text-sm">
+          <div className="flex justify-between items-center">
+            <span className="text-gray-500">User</span>
+            <div className="flex items-center gap-2">
+              <Avatar initials={user.avatar} size="sm" />
+              <span className="font-medium text-gray-800">{user.name}</span>
+            </div>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-gray-500">Resource</span>
+            <div className="text-right">
+              <p className="font-medium text-gray-800">{target.resourceName}</p>
+              <p className="text-xs text-gray-400">{target.resourcePath}</p>
+            </div>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-gray-500">System</span>
+            <SystemBadge type={target.systemType} />
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-gray-500">Current Permissions</span>
+            <div className="flex gap-1">
+              {target.permissions.map((p) => {
+                const cls = {
+                  read:  'bg-blue-100 text-blue-700',
+                  write: 'bg-purple-100 text-purple-700',
+                  admin: 'bg-red-100 text-red-700',
+                }[p];
+                return (
+                  <span key={p} className={`px-2 py-0.5 rounded text-xs font-semibold capitalize ${cls}`}>
+                    {p}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Comment */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            Reason for Removal <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            rows={3}
+            placeholder="Explain why this access should be removed..."
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-red-400"
+            autoFocus
+          />
+          {!comment.trim() && (
+            <p className="text-xs text-gray-400 mt-1">A reason is required to submit.</p>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 // ─── Permission Toggle Chip ───────────────────────────────────────────────────
 
 interface PermChipProps {
@@ -95,8 +214,10 @@ interface UserDetailPanelProps {
 }
 
 const UserDetailPanel: React.FC<UserDetailPanelProps> = ({ user, isAdmin }) => {
-  const { accessEntries, togglePermission, revokeResource } = useStore();
+  const { accessEntries, togglePermission, submitRequest, currentUser } = useStore();
   const [systemFilter, setSystemFilter] = useState<SystemType | 'all'>('all');
+  const [revokeTarget, setRevokeTarget] = useState<RevokeTarget | null>(null);
+  const [revokeLoading, setRevokeLoading] = useState(false);
 
   const entries = accessEntries.filter((e) => e.userId === user.id);
 
@@ -214,9 +335,16 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({ user, isAdmin }) => {
                   {isAdmin && (
                     <td className="px-4 py-3">
                       <button
-                        onClick={() => revokeResource(user.id, entry.resourceId)}
+                        onClick={() => setRevokeTarget({
+                          resourceId:   entry.resourceId,
+                          resourceName: meta.name,
+                          resourcePath: meta.path,
+                          systemType:   meta.systemType,
+                          resourceType: meta.resourceType,
+                          permissions:  entry.permissions,
+                        })}
                         className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all"
-                        title="Revoke all access"
+                        title="Request access removal"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -229,6 +357,32 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({ user, isAdmin }) => {
         )}
       </div>
 
+      {/* Revoke confirm modal */}
+      {revokeTarget && (
+        <RevokeConfirmModal
+          target={revokeTarget}
+          user={user}
+          loading={revokeLoading}
+          onClose={() => setRevokeTarget(null)}
+          onConfirm={async (comment) => {
+            setRevokeLoading(true);
+            await new Promise((r) => setTimeout(r, 900));
+            submitRequest({
+              requesterId:  currentUser.id,
+              targetUserId: user.id,
+              systemType:   revokeTarget.systemType,
+              resourceId:   revokeTarget.resourceId,
+              resourceName: revokeTarget.resourceName,
+              resourcePath: revokeTarget.resourcePath,
+              accessLevel:  'none',
+              reason:       comment,
+              requestType:  'revoke',
+            });
+            setRevokeLoading(false);
+            setRevokeTarget(null);
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -136,15 +136,19 @@ export const useStore = create<AppState>((set, get) => ({
     }));
     const req = get().requests.find((r) => r.id === id);
     if (req) {
-      get().grantAccess(req.targetUserId, req.resourceId, 'table', [req.accessLevel as Permission]);
+      if (req.requestType === 'revoke') {
+        get().revokeResource(req.targetUserId, req.resourceId);
+      } else {
+        get().grantAccess(req.targetUserId, req.resourceId, 'table', [req.accessLevel as Permission]);
+      }
       get().addAuditLog({
-        action: 'request_approved',
+        action: req.requestType === 'revoke' ? 'access_revoked' : 'request_approved',
         actorId: reviewerId,
         targetUserId: req.targetUserId,
         resourceId: req.resourceId,
         resourceName: req.resourceName,
-        before: 'none',
-        after: req.accessLevel,
+        before: req.requestType === 'revoke' ? 'granted' : 'none',
+        after:  req.requestType === 'revoke' ? 'none'    : req.accessLevel,
         timestamp: new Date().toISOString(),
         ipAddress: '10.0.1.45',
         details: `Request ${id} approved. ${comment}`,

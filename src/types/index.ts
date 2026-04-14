@@ -97,6 +97,7 @@ export interface AccessRequest {
   accessLevel: AccessLevel;
   reason: string;
   status: RequestStatus;
+  requestType?: 'grant' | 'revoke'; // default 'grant' when omitted
   createdAt: string;
   updatedAt: string;
   reviewerId?: string;
