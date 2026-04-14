@@ -313,18 +313,22 @@ const UserDetailPanel: React.FC<UserDetailPanelProps> = ({ user, isAdmin }) => {
                   <td className="px-4 py-3 hidden md:table-cell">
                     <SystemBadge type={meta.systemType} />
                   </td>
-                  {/* Permissions — independent toggles */}
+                  {/* Permissions — only show active */}
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
-                      {PERMISSIONS.map((p) => (
-                        <PermChip
-                          key={p}
-                          permission={p}
-                          active={entry.permissions.includes(p)}
-                          readonly={!isAdmin}
-                          onToggle={() => togglePermission(user.id, entry.resourceId, p)}
-                        />
-                      ))}
+                      {entry.permissions.length === 0 ? (
+                        <span className="text-xs text-gray-400 italic">None</span>
+                      ) : (
+                        PERMISSIONS.filter((p) => entry.permissions.includes(p)).map((p) => (
+                          <PermChip
+                            key={p}
+                            permission={p}
+                            active
+                            readonly={!isAdmin}
+                            onToggle={() => togglePermission(user.id, entry.resourceId, p)}
+                          />
+                        ))
+                      )}
                     </div>
                   </td>
                   {/* Granted date */}
