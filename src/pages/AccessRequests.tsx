@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import {
   CheckCircle2, XCircle, Clock, MessageSquare,
-  ChevronDown, ChevronUp, Plus, FileText,
+  ChevronDown, ChevronUp, Plus, FileText, MinusCircle,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { SystemBadge, AccessBadge } from '../components/ui/Badge';
+import { SystemBadge, AccessBadge, StatusBadge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { Avatar } from '../components/ui/Avatar';
 import { AccessRequest, AccessLevel, RequestStatus, SystemType } from '../types';
@@ -367,11 +367,11 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ request, action, onClose, onC
   );
 };
 
-// ─── Request Row ──────────────────────────────────────────────────────────────
+// ─── Request Row (table row) ──────────────────────────────────────────────────
 
 interface RequestRowProps {
-  request: AccessRequest;
-  isAdmin: boolean;
+  request:   AccessRequest;
+  isAdmin:   boolean;
   onApprove: (r: AccessRequest) => void;
   onReject:  (r: AccessRequest) => void;
 }
@@ -381,98 +381,149 @@ const RequestRow: React.FC<RequestRowProps> = ({ request, isAdmin, onApprove, on
   const requester = MOCK_USERS.find((u) => u.id === request.requesterId);
   const target    = MOCK_USERS.find((u) => u.id === request.targetUserId);
   const reviewer  = MOCK_USERS.find((u) => u.id === request.reviewerId);
+  const isRevoke  = request.requestType === 'revoke';
 
   return (
-    <div className="border border-gray-100 rounded-xl overflow-hidden">
-      <div className="flex items-center gap-4 px-5 py-4 bg-white hover:bg-gray-50/60 transition-colors">
-        <Avatar initials={requester?.avatar ?? '?'} size="md" />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-gray-800 text-sm">{requester?.name}</span>
-            {requester?.id !== target?.id && (
-              <span className="text-xs text-gray-400">
-                on behalf of <strong>{target?.name}</strong>
-              </span>
-            )}
-            {request.requestType === 'revoke' ? (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 border border-red-200">
-                Remove Access
-              </span>
-            ) : (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 border border-blue-200">
-                Grant Access
-              </span>
-            )}
+    <>
+      <tr className={`border-b border-gray-50 hover:bg-gray-50/60 transition-colors ${expanded ? 'bg-blue-50/30' : ''}`}>
+        {/* Requester */}
+        <td className="px-4 py-3">
+          <div className="flex items-center gap-2.5">
+            <Avatar initials={requester?.avatar ?? '?'} size="sm" />
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-800 truncate">{requester?.name}</p>
+              <p className="text-xs text-gray-400 truncate">{requester?.email}</p>
+            </div>
           </div>
-          <p className="text-xs text-gray-500 mt-0.5 truncate">
-            {request.resourcePath} › {request.resourceName}
-          </p>
-        </div>
+        </td>
 
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {isAdmin && request.status === 'pending' && (
-            <>
-              <Button
-                variant="success" size="sm"
-                icon={<CheckCircle2 className="w-4 h-4" />}
-                onClick={() => onApprove(request)}
-              >
-                Approve
-              </Button>
-              <Button
-                variant="danger" size="sm"
-                icon={<XCircle className="w-4 h-4" />}
-                onClick={() => onReject(request)}
-              >
-                Reject
-              </Button>
-            </>
+        {/* For User */}
+        <td className="px-4 py-3">
+          {requester?.id !== target?.id ? (
+            <div className="flex items-center gap-2">
+              <Avatar initials={target?.avatar ?? '?'} size="sm" />
+              <p className="text-sm text-gray-700 truncate">{target?.name}</p>
+            </div>
+          ) : (
+            <span className="text-xs text-gray-400">—</span>
           )}
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-          >
-            {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
-        </div>
-      </div>
+        </td>
 
+        {/* Resource */}
+        <td className="px-4 py-3 max-w-[200px]">
+          <p className="text-sm font-medium text-gray-800 truncate">{request.resourceName}</p>
+          <p className="text-xs text-gray-400 truncate">{request.resourcePath}</p>
+        </td>
+
+        {/* System */}
+        <td className="px-4 py-3">
+          <SystemBadge type={request.systemType} />
+        </td>
+
+        {/* Access Level */}
+        <td className="px-4 py-3">
+          {isRevoke
+            ? <span className="text-xs text-gray-400 italic">Revoke all</span>
+            : <AccessBadge level={request.accessLevel} />
+          }
+        </td>
+
+        {/* Type */}
+        <td className="px-4 py-3">
+          {isRevoke ? (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 border border-red-200">
+              <MinusCircle className="w-3 h-3" /> Remove
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 border border-blue-200">
+              <CheckCircle2 className="w-3 h-3" /> Grant
+            </span>
+          )}
+        </td>
+
+        {/* Status */}
+        <td className="px-4 py-3">
+          <StatusBadge status={request.status} />
+        </td>
+
+        {/* Date */}
+        <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+          {new Date(request.createdAt).toLocaleDateString()}
+        </td>
+
+        {/* Actions */}
+        <td className="px-4 py-3">
+          <div className="flex items-center gap-1.5">
+            {isAdmin && request.status === 'pending' && (
+              <>
+                <Button
+                  variant="success" size="sm"
+                  icon={<CheckCircle2 className="w-3.5 h-3.5" />}
+                  onClick={() => onApprove(request)}
+                >
+                  Approve
+                </Button>
+                <Button
+                  variant="danger" size="sm"
+                  icon={<XCircle className="w-3.5 h-3.5" />}
+                  onClick={() => onReject(request)}
+                >
+                  Reject
+                </Button>
+              </>
+            )}
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              title="Show details"
+            >
+              {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+          </div>
+        </td>
+      </tr>
+
+      {/* Expandable detail row */}
       {expanded && (
-        <div className="border-t border-gray-100 bg-gray-50/60 px-5 py-4 space-y-3 text-sm">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div>
-              <p className="text-xs text-gray-500">Submitted</p>
-              <p className="font-medium">{new Date(request.createdAt).toLocaleString()}</p>
+        <tr className="border-b border-gray-100">
+          <td colSpan={9} className="px-6 py-4 bg-gray-50/70">
+            <div className="space-y-3 text-sm max-w-3xl">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500 mb-0.5">Submitted</p>
+                  <p className="font-medium text-gray-700">{new Date(request.createdAt).toLocaleString()}</p>
+                </div>
+                {request.updatedAt !== request.createdAt && (
+                  <div>
+                    <p className="text-xs text-gray-500 mb-0.5">Last Updated</p>
+                    <p className="font-medium text-gray-700">{new Date(request.updatedAt).toLocaleString()}</p>
+                  </div>
+                )}
+                {reviewer && (
+                  <div>
+                    <p className="text-xs text-gray-500 mb-0.5">Reviewed by</p>
+                    <p className="font-medium text-gray-700">{reviewer.name}</p>
+                  </div>
+                )}
+              </div>
+              <div className="bg-white border border-gray-200 rounded-lg p-3">
+                <p className="text-xs text-gray-500 mb-1">Business Justification</p>
+                <p className="text-gray-700">{request.reason}</p>
+              </div>
+              {request.reviewerComment && (
+                <div className="flex gap-2 bg-white border border-gray-200 rounded-lg p-3">
+                  <MessageSquare className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-gray-500 mb-0.5">Reviewer Comment</p>
+                    <p className="text-gray-700">{request.reviewerComment}</p>
+                  </div>
+                </div>
+              )}
             </div>
-            {request.updatedAt !== request.createdAt && (
-              <div>
-                <p className="text-xs text-gray-500">Updated</p>
-                <p className="font-medium">{new Date(request.updatedAt).toLocaleString()}</p>
-              </div>
-            )}
-            {reviewer && (
-              <div>
-                <p className="text-xs text-gray-500">Reviewed by</p>
-                <p className="font-medium">{reviewer.name}</p>
-              </div>
-            )}
-          </div>
-          <div className="bg-white border border-gray-200 rounded-lg p-3">
-            <p className="text-xs text-gray-500 mb-1">Business Justification</p>
-            <p className="text-gray-700">{request.reason}</p>
-          </div>
-          {request.reviewerComment && (
-            <div className="flex gap-2">
-              <MessageSquare className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-xs text-gray-500 mb-0.5">Reviewer Comment</p>
-                <p className="text-gray-700">{request.reviewerComment}</p>
-              </div>
-            </div>
-          )}
-        </div>
+          </td>
+        </tr>
       )}
-    </div>
+    </>
   );
 };
 
@@ -559,11 +610,11 @@ export const AccessRequests: React.FC = () => {
         </div>
       </Card>
 
-      {/* Request list */}
-      <div className="space-y-3">
+      {/* Request table */}
+      <Card padding={false} className="overflow-x-auto scrollbar-thin">
         {filtered.length === 0 ? (
-          <Card className="text-center py-16">
-            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
               <FileText className="w-6 h-6 text-gray-400" />
             </div>
             <p className="text-gray-500 font-medium">No {activeTab === 'all' ? '' : activeTab} requests</p>
@@ -572,19 +623,36 @@ export const AccessRequests: React.FC = () => {
                 ? 'Click "New Request" to submit one.'
                 : 'Nothing to show here.'}
             </p>
-          </Card>
+          </div>
         ) : (
-          filtered.map((req) => (
-            <RequestRow
-              key={req.id}
-              request={req}
-              isAdmin={isAdmin}
-              onApprove={(r) => { setModalRequest(r); setModalAction('approve'); }}
-              onReject={(r)  => { setModalRequest(r); setModalAction('reject');  }}
-            />
-          ))
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Requester</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">For User</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Resource</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">System</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Access Level</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((req) => (
+                <RequestRow
+                  key={req.id}
+                  request={req}
+                  isAdmin={isAdmin}
+                  onApprove={(r) => { setModalRequest(r); setModalAction('approve'); }}
+                  onReject={(r)  => { setModalRequest(r); setModalAction('reject');  }}
+                />
+              ))}
+            </tbody>
+          </table>
         )}
-      </div>
+      </Card>
 
       {/* New Request modal */}
       <Modal
