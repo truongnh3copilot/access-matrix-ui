@@ -94,7 +94,10 @@ export interface AccessRequest {
   resourceId: string;
   resourceName: string;
   resourcePath: string; // e.g. "sales_db > public > orders"
-  accessLevel: AccessLevel;
+  resourceIds?: string[];            // multiple resources in one request
+  resourceNames?: string[];          // display names for each resourceId
+  accessLevel: AccessLevel;          // kept for backward compat / display
+  accessLevels?: Permission[];       // multi-select from form; takes precedence when present
   reason: string;
   status: RequestStatus;
   requestType?: 'grant' | 'revoke'; // default 'grant' when omitted

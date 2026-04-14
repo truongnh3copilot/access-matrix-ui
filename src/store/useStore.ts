@@ -1,8 +1,9 @@
 import { create } from 'zustand';
-import { AccessEntry, AccessRequest, AuditLog, CurrentUser, Permission } from '../types';
+import { AccessEntry, AccessRequest, AuditLog, CurrentUser, DataSource, Permission } from '../types';
 import { MOCK_ACCESS_ENTRIES } from '../data/accessMatrix';
 import { MOCK_REQUESTS } from '../data/requests';
 import { MOCK_AUDIT_LOGS } from '../data/auditLogs';
+import { MOCK_DATA_SOURCES } from '../data/dataSources';
 
 interface AppState {
   currentUser: CurrentUser;
@@ -23,6 +24,10 @@ interface AppState {
   // Audit logs
   auditLogs: AuditLog[];
   addAuditLog: (log: Omit<AuditLog, 'id'>) => void;
+
+  // Data sources
+  dataSources: DataSource[];
+  addDataSource: (ds: Omit<DataSource, 'id' | 'lastSync'>) => void;
 
   // UI
   sidebarCollapsed: boolean;
@@ -137,9 +142,14 @@ export const useStore = create<AppState>((set, get) => ({
     const req = get().requests.find((r) => r.id === id);
     if (req) {
       if (req.requestType === 'revoke') {
-        get().revokeResource(req.targetUserId, req.resourceId);
+        const ids = req.resourceIds?.length ? req.resourceIds : [req.resourceId];
+        ids.forEach((rId) => get().revokeResource(req.targetUserId, rId));
       } else {
-        get().grantAccess(req.targetUserId, req.resourceId, 'table', [req.accessLevel as Permission]);
+        const perms = (req.accessLevels && req.accessLevels.length > 0)
+          ? req.accessLevels
+          : [req.accessLevel as Permission];
+        const ids = req.resourceIds?.length ? req.resourceIds : [req.resourceId];
+        ids.forEach((rId) => get().grantAccess(req.targetUserId, rId, 'table', perms));
       }
       get().addAuditLog({
         action: req.requestType === 'revoke' ? 'access_revoked' : 'request_approved',
@@ -184,6 +194,16 @@ export const useStore = create<AppState>((set, get) => ({
   addAuditLog: (log) =>
     set((state) => ({
       auditLogs: [{ ...log, id: `al${Date.now()}` }, ...state.auditLogs],
+    })),
+
+  // ── Data sources ─────────────────────────────────────────────────────────────
+  dataSources: MOCK_DATA_SOURCES,
+  addDataSource: (ds) =>
+    set((state) => ({
+      dataSources: [
+        ...state.dataSources,
+        { ...ds, id: `ds${Date.now()}`, lastSync: new Date().toISOString() },
+      ],
     })),
 
   // ── UI ──────────────────────────────────────────────────────────────────────
