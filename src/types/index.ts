@@ -71,12 +71,13 @@ export interface DataSource {
 // ─── Access Matrix ────────────────────────────────────────────────────────────
 
 export type AccessLevel = 'none' | 'read' | 'write' | 'admin';
+export type Permission  = 'read' | 'write' | 'admin';
 
 export interface AccessEntry {
   userId: string;
   resourceId: string; // tableId or reportId
   resourceType: 'table' | 'report';
-  accessLevel: AccessLevel;
+  permissions: Permission[]; // user can hold multiple e.g. ['read', 'write']
   grantedBy: string;
   grantedAt: string;
 }

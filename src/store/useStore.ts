@@ -1,17 +1,18 @@
 import { create } from 'zustand';
-import { AccessEntry, AccessRequest, AuditLog, CurrentUser } from '../types';
+import { AccessEntry, AccessRequest, AuditLog, CurrentUser, Permission } from '../types';
 import { MOCK_ACCESS_ENTRIES } from '../data/accessMatrix';
 import { MOCK_REQUESTS } from '../data/requests';
 import { MOCK_AUDIT_LOGS } from '../data/auditLogs';
 
 interface AppState {
-  // Current session user (for role-based UI)
   currentUser: CurrentUser;
   setCurrentUser: (user: CurrentUser) => void;
 
   // Access entries
   accessEntries: AccessEntry[];
-  updateAccessEntry: (userId: string, resourceId: string, level: AccessEntry['accessLevel']) => void;
+  togglePermission: (userId: string, resourceId: string, permission: Permission) => void;
+  grantAccess: (userId: string, resourceId: string, resourceType: 'table' | 'report', permissions: Permission[]) => void;
+  revokeResource: (userId: string, resourceId: string) => void;
 
   // Requests
   requests: AccessRequest[];
@@ -23,7 +24,7 @@ interface AppState {
   auditLogs: AuditLog[];
   addAuditLog: (log: Omit<AuditLog, 'id'>) => void;
 
-  // UI state
+  // UI
   sidebarCollapsed: boolean;
   toggleSidebar: () => void;
 }
@@ -39,17 +40,40 @@ export const useStore = create<AppState>((set, get) => ({
   currentUser: ADMIN_USER,
   setCurrentUser: (user) => set({ currentUser: user }),
 
+  // ── Access entries ──────────────────────────────────────────────────────────
   accessEntries: MOCK_ACCESS_ENTRIES,
-  updateAccessEntry: (userId, resourceId, level) =>
+
+  togglePermission: (userId, resourceId, permission) =>
+    set((state) => {
+      const entry = state.accessEntries.find(
+        (e) => e.userId === userId && e.resourceId === resourceId
+      );
+      if (!entry) return state; // entry must exist first (use grantAccess to create)
+      const has = entry.permissions.includes(permission);
+      const next = has
+        ? entry.permissions.filter((p) => p !== permission)
+        : [...entry.permissions, permission];
+      return {
+        accessEntries: state.accessEntries.map((e) =>
+          e.userId === userId && e.resourceId === resourceId
+            ? { ...e, permissions: next }
+            : e
+        ),
+      };
+    }),
+
+  grantAccess: (userId, resourceId, resourceType, permissions) =>
     set((state) => {
       const exists = state.accessEntries.find(
         (e) => e.userId === userId && e.resourceId === resourceId
       );
       if (exists) {
+        // Merge permissions
+        const merged = Array.from(new Set([...exists.permissions, ...permissions])) as Permission[];
         return {
           accessEntries: state.accessEntries.map((e) =>
             e.userId === userId && e.resourceId === resourceId
-              ? { ...e, accessLevel: level }
+              ? { ...e, permissions: merged }
               : e
           ),
         };
@@ -60,8 +84,8 @@ export const useStore = create<AppState>((set, get) => ({
           {
             userId,
             resourceId,
-            resourceType: 'table',
-            accessLevel: level,
+            resourceType,
+            permissions,
             grantedBy: get().currentUser.id,
             grantedAt: new Date().toISOString(),
           },
@@ -69,7 +93,16 @@ export const useStore = create<AppState>((set, get) => ({
       };
     }),
 
+  revokeResource: (userId, resourceId) =>
+    set((state) => ({
+      accessEntries: state.accessEntries.filter(
+        (e) => !(e.userId === userId && e.resourceId === resourceId)
+      ),
+    })),
+
+  // ── Requests ────────────────────────────────────────────────────────────────
   requests: MOCK_REQUESTS,
+
   submitRequest: (req) => {
     const newReq: AccessRequest = {
       ...req,
@@ -92,23 +125,18 @@ export const useStore = create<AppState>((set, get) => ({
       details: `Access request submitted for ${req.resourceName}.`,
     });
   },
+
   approveRequest: (id, reviewerId, comment) => {
     set((state) => ({
       requests: state.requests.map((r) =>
         r.id === id
-          ? {
-              ...r,
-              status: 'approved',
-              reviewerId,
-              reviewerComment: comment,
-              updatedAt: new Date().toISOString(),
-            }
+          ? { ...r, status: 'approved', reviewerId, reviewerComment: comment, updatedAt: new Date().toISOString() }
           : r
       ),
     }));
     const req = get().requests.find((r) => r.id === id);
     if (req) {
-      get().updateAccessEntry(req.targetUserId, req.resourceId, req.accessLevel);
+      get().grantAccess(req.targetUserId, req.resourceId, 'table', [req.accessLevel as Permission]);
       get().addAuditLog({
         action: 'request_approved',
         actorId: reviewerId,
@@ -123,17 +151,12 @@ export const useStore = create<AppState>((set, get) => ({
       });
     }
   },
+
   rejectRequest: (id, reviewerId, comment) => {
     set((state) => ({
       requests: state.requests.map((r) =>
         r.id === id
-          ? {
-              ...r,
-              status: 'rejected',
-              reviewerId,
-              reviewerComment: comment,
-              updatedAt: new Date().toISOString(),
-            }
+          ? { ...r, status: 'rejected', reviewerId, reviewerComment: comment, updatedAt: new Date().toISOString() }
           : r
       ),
     }));
@@ -152,13 +175,14 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
+  // ── Audit logs ──────────────────────────────────────────────────────────────
   auditLogs: MOCK_AUDIT_LOGS,
   addAuditLog: (log) =>
     set((state) => ({
       auditLogs: [{ ...log, id: `al${Date.now()}` }, ...state.auditLogs],
     })),
 
+  // ── UI ──────────────────────────────────────────────────────────────────────
   sidebarCollapsed: false,
-  toggleSidebar: () =>
-    set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+  toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
 }));
